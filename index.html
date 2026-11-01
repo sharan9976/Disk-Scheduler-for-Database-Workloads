@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Disk Scheduler for Database Workloads</title>
+  <meta name="description" content="Interactive animated simulator comparing FCFS, SSTF, SCAN, and C-SCAN disk scheduling algorithms under database workloads.">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Ambient background glow elements -->
+  <div class="ambient-glow glow-1"></div>
+  <div class="ambient-glow glow-2"></div>
+  <div class="ambient-glow glow-3"></div>
+
+  <!-- Top Navigation -->
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="logo">
+        <span class="logo-icon">💽</span>
+        <span class="logo-text">DiskSched<strong>DB</strong></span>
+      </div>
+      <nav class="nav-links">
+        <a href="#simulator">Simulator</a>
+        <a href="#race-section">Compare Race</a>
+        <a href="#results-section">Results</a>
+        <a href="#fairness-section">Fairness & Starvation</a>
+        <a href="#algorithms-section">Theory</a>
+      </nav>
+      <a href="#simulator" class="btn-primary nav-cta">Launch Demo</a>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero-section">
+    <div class="hero-content">
+      <div class="badge-pill">
+        <span class="badge-dot"></span> Operating Systems & Database I/O Simulation
+      </div>
+      <h1 class="hero-title">
+        Disk Scheduler for <br>
+        <span class="gradient-text">Database Workloads</span>
+      </h1>
+      <p class="hero-subtitle">
+        Observe real-time head movement, seek latency, and starvation across 
+        <strong>FCFS</strong>, <strong>SSTF</strong>, <strong>SCAN</strong>, and <strong>C-SCAN</strong> algorithms.
+        Designed for OLTP index lookups, sequential table scans, and random transactional I/O.
+      </p>
+      <div class="hero-actions">
+        <a href="#simulator" class="btn-primary btn-lg" id="btn-start-sim">
+          <span>Start Simulation</span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+        <a href="#race-section" class="btn-secondary btn-lg" id="btn-hero-compare">
+          <span>Compare All 4 Race</span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+        </a>
+      </div>
+      <div class="hero-stats-banner">
+        <div class="hero-stat">
+          <span class="stat-number">4</span>
+          <span class="stat-label">Core Algorithms</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="hero-stat">
+          <span class="stat-number">3</span>
+          <span class="stat-label">DB Workload Models</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="hero-stat">
+          <span class="stat-number">0</span>
+          <span class="stat-label">FCFS Overtakings</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="hero-stat">
+          <span class="stat-number">60 FPS</span>
+          <span class="stat-label">Smooth Canvas Engine</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Simulator Container -->
+  <main class="main-container">
+
+    <!-- Simulator Section (Controls + Live Visualizer) -->
+    <section id="simulator" class="section-card simulator-section">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Interactive Disk Visualizer</h2>
+          <p class="section-desc">Tune workload parameters and watch the disk head navigate physical tracks.</p>
+        </div>
+        <div class="header-badges">
+          <span class="mode-badge" id="current-workload-badge">Hotspot (DB Index)</span>
+          <span class="mode-badge algo-badge" id="current-algo-badge">SSTF</span>
+        </div>
+      </div>
+
+      <!-- Controls Panel -->
+      <div class="controls-grid">
+        <div class="control-group">
+          <label for="workload-select">Database Workload</label>
+          <div class="select-wrapper">
+            <select id="workload-select" class="form-select">
+              <option value="hotspot" selected>Hotspot (80% in 3 Index Zones)</option>
+              <option value="random">Random (Uniform Transactional)</option>
+              <option value="sequential">Sequential (Table / WAL Scan)</option>
+            </select>
+          </div>
+          <span class="control-caption" id="workload-caption">80% of reads hit 3 small index zones of 20 tracks.</span>
+        </div>
+
+        <div class="control-group">
+          <label for="algo-select">Scheduling Algorithm</label>
+          <div class="select-wrapper">
+            <select id="algo-select" class="form-select">
+              <option value="FCFS">FCFS (First-Come, First-Served)</option>
+              <option value="SSTF" selected>SSTF (Shortest Seek Time First)</option>
+              <option value="SCAN">SCAN (Elevator to Boundary)</option>
+              <option value="C-SCAN">C-SCAN (Circular Return Scan)</option>
+            </select>
+          </div>
+          <span class="control-caption" id="algo-caption">Greedily selects nearest pending track.</span>
+        </div>
+
+        <div class="control-group">
+          <div class="slider-header">
+            <label for="req-count-slider">Requests: <span id="req-count-val" class="highlight-val">50</span></label>
+          </div>
+          <input type="range" id="req-count-slider" min="10" max="200" value="50" step="5" class="slider">
+          <div class="slider-limits"><span>10</span><span>200</span></div>
+        </div>
+
+        <div class="control-group">
+          <div class="slider-header">
+            <label for="disk-size-slider">Disk Tracks: <span id="disk-size-val" class="highlight-val">200</span></label>
+          </div>
+          <input type="range" id="disk-size-slider" min="100" max="500" value="200" step="20" class="slider">
+          <div class="slider-limits"><span>100</span><span>500</span></div>
+        </div>
+
+        <div class="control-group">
+          <div class="slider-header">
+            <label for="head-pos-slider">Start Head Track: <span id="head-pos-val" class="highlight-val">50</span></label>
+          </div>
+          <input type="range" id="head-pos-slider" min="0" max="199" value="50" step="1" class="slider">
+          <div class="slider-limits"><span>0</span><span id="head-slider-max">199</span></div>
+        </div>
+
+        <div class="control-group">
+          <div class="slider-header">
+            <label for="speed-slider">Speed: <span id="speed-val" class="highlight-val">1.0x</span></label>
+          </div>
+          <input type="range" id="speed-slider" min="0.2" max="3.0" value="1.0" step="0.2" class="slider">
+          <div class="slider-limits"><span>0.2x</span><span>3.0x</span></div>
+        </div>
+      </div>
+
+      <!-- Action Button Bar -->
+      <div class="action-bar">
+        <div class="playback-controls">
+          <button id="btn-play" class="btn-action btn-play" title="Play / Resume">
+            <svg class="icon-play" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <span id="play-text">Play</span>
+          </button>
+          <button id="btn-pause" class="btn-action" title="Pause">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+            <span>Pause</span>
+          </button>
+          <button id="btn-step" class="btn-action" title="Step one seek">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+            <span>Step</span>
+          </button>
+          <button id="btn-reset" class="btn-action" title="Reset animation">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+            <span>Reset</span>
+          </button>
+        </div>
+
+        <div class="workload-controls">
+          <button id="btn-new-workload" class="btn-outline">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            <span>New Workload</span>
+          </button>
+          <button id="btn-compare-all" class="btn-gradient">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            <span>Race All 4</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Counters HUD -->
+      <div class="hud-grid">
+        <div class="hud-card">
+          <span class="hud-label">Current Head Track</span>
+          <div class="hud-value-row">
+            <span class="hud-value" id="hud-current-track">50</span>
+            <span class="hud-unit">/ <span id="hud-disk-total">199</span></span>
+          </div>
+          <div class="hud-sub" id="hud-head-status">Idle at start position</div>
+        </div>
+
+        <div class="hud-card">
+          <span class="hud-label">Requests Serviced</span>
+          <div class="hud-value-row">
+            <span class="hud-value" id="hud-served-count">0</span>
+            <span class="hud-unit">/ <span id="hud-req-total">50</span></span>
+          </div>
+          <div class="hud-progress-bar">
+            <div class="hud-progress-fill" id="hud-progress-bar-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <div class="hud-card">
+          <span class="hud-label">Total Seek Distance</span>
+          <div class="hud-value-row">
+            <span class="hud-value text-accent" id="hud-seek-dist">0</span>
+            <span class="hud-unit">tracks</span>
+          </div>
+          <div class="hud-sub">Accumulated cylinder hops</div>
+        </div>
+
+        <div class="hud-card">
+          <span class="hud-label">Current Overtakings</span>
+          <div class="hud-value-row">
+            <span class="hud-value text-warning" id="hud-overtake-stat">0</span>
+            <span class="hud-unit">max</span>
+          </div>
+          <div class="hud-sub" id="hud-fairness-caption">FCFS: strictly 0</div>
+        </div>
+      </div>
+
+      <!-- Live Animated Disk Visualizer Canvas -->
+      <div class="visualizer-container">
+        <div class="viz-header">
+          <div class="viz-legend">
+            <span class="legend-item"><span class="legend-dot dot-head"></span> Head</span>
+            <span class="legend-item"><span class="legend-dot dot-pending"></span> Pending Request</span>
+            <span class="legend-item"><span class="legend-dot dot-served"></span> Served</span>
+            <span class="legend-item"><span class="legend-dot dot-boundary"></span> Boundary Travel (SCAN)</span>
+            <span class="legend-item"><span class="legend-dot dot-jump"></span> Return Jump (C-SCAN)</span>
+            <span class="legend-item"><span class="legend-dot dot-starved"></span> Highly Overtaken</span>
+          </div>
+          <div class="viz-tip">Hover requests to inspect arrival index and track.</div>
+        </div>
+
+        <!-- Canvas for Disk Track Bar and Heads -->
+        <div class="canvas-wrapper">
+          <canvas id="diskCanvas" width="1100" height="230"></canvas>
+          <div id="canvas-tooltip" class="custom-tooltip"></div>
+        </div>
+
+        <!-- Track Scale Ruler -->
+        <div class="track-ruler" id="track-ruler">
+          <span>Track 0 (Inner)</span>
+          <span id="ruler-quarter">Track 50</span>
+          <span id="ruler-mid">Track 100</span>
+          <span id="ruler-three-quarter">Track 150</span>
+          <span id="ruler-max">Track 199 (Outer)</span>
+        </div>
+      </div>
+
+      <!-- Real-time Head Movement Chart -->
+      <div class="chart-section-wrapper">
+        <div class="chart-header">
+          <div>
+            <h3 class="chart-title">Head Movement Trajectory</h3>
+            <p class="chart-desc">Track position vs. seek step. Slopes indicate physical head movement across cylinders.</p>
+          </div>
+          <div class="chart-badge" id="chart-step-counter">Step 0 of 0</div>
+        </div>
+        <div class="chart-canvas-box">
+          <canvas id="movementChart" height="90"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Compare All Race Section -->
+    <section id="race-section" class="section-card race-section">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Race All 4 Algorithms</h2>
+          <p class="section-desc">Watch FCFS, SSTF, SCAN, and C-SCAN compete simultaneously on the exact same workload.</p>
+        </div>
+        <div class="race-actions">
+          <button id="btn-start-race" class="btn-gradient">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <span>Start Algorithm Race</span>
+          </button>
+          <button id="btn-reset-race" class="btn-outline">Reset Race</button>
+        </div>
+      </div>
+
+      <!-- 4 Mini Disk Tracks -->
+      <div class="race-lanes-container" id="race-lanes-container">
+        <!-- FCFS Lane -->
+        <div class="race-lane" id="lane-FCFS">
+          <div class="lane-header">
+            <div class="lane-algo-info">
+              <span class="lane-badge badge-fcfs">FCFS</span>
+              <span class="lane-name">First-Come First-Served</span>
+            </div>
+            <div class="lane-metrics">
+              <span class="lane-stat">Seek: <strong id="race-seek-FCFS">0</strong></span>
+              <span class="lane-stat">Served: <strong id="race-served-FCFS">0/50</strong></span>
+              <span class="lane-rank-badge" id="race-rank-FCFS">-</span>
+            </div>
+          </div>
+          <div class="lane-canvas-box">
+            <canvas id="raceCanvas-FCFS" width="1050" height="52"></canvas>
+          </div>
+        </div>
+
+        <!-- SSTF Lane -->
+        <div class="race-lane" id="lane-SSTF">
+          <div class="lane-header">
+            <div class="lane-algo-info">
+              <span class="lane-badge badge-sstf">SSTF</span>
+              <span class="lane-name">Shortest Seek Time First</span>
+            </div>
+            <div class="lane-metrics">
+              <span class="lane-stat">Seek: <strong id="race-seek-SSTF">0</strong></span>
+              <span class="lane-stat">Served: <strong id="race-served-SSTF">0/50</strong></span>
+              <span class="lane-rank-badge" id="race-rank-SSTF">-</span>
+            </div>
+          </div>
+          <div class="lane-canvas-box">
+            <canvas id="raceCanvas-SSTF" width="1050" height="52"></canvas>
+          </div>
+        </div>
+
+        <!-- SCAN Lane -->
+        <div class="race-lane" id="lane-SCAN">
+          <div class="lane-header">
+            <div class="lane-algo-info">
+              <span class="lane-badge badge-scan">SCAN</span>
+              <span class="lane-name">Elevator to Boundary</span>
+            </div>
+            <div class="lane-metrics">
+              <span class="lane-stat">Seek: <strong id="race-seek-SCAN">0</strong></span>
+              <span class="lane-stat">Served: <strong id="race-served-SCAN">0/50</strong></span>
+              <span class="lane-rank-badge" id="race-rank-SCAN">-</span>
+            </div>
+          </div>
+          <div class="lane-canvas-box">
+            <canvas id="raceCanvas-SCAN" width="1050" height="52"></canvas>
+          </div>
+        </div>
+
+        <!-- C-SCAN Lane -->
+        <div class="race-lane" id="lane-CSCAN">
+          <div class="lane-header">
+            <div class="lane-algo-info">
+              <span class="lane-badge badge-cscan">C-SCAN</span>
+              <span class="lane-name">Circular Return Scan</span>
+            </div>
+            <div class="lane-metrics">
+              <span class="lane-stat">Seek: <strong id="race-seek-CSCAN">0</strong></span>
+              <span class="lane-stat">Served: <strong id="race-served-CSCAN">0/50</strong></span>
+              <span class="lane-rank-badge" id="race-rank-CSCAN">-</span>
+            </div>
+          </div>
+          <div class="lane-canvas-box">
+            <canvas id="raceCanvas-CSCAN" width="1050" height="52"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Race Winner Banner -->
+      <div class="race-banner hidden" id="race-banner">
+        <div class="race-trophy">🏆</div>
+        <div class="race-banner-text">
+          <h4 id="race-winner-title">SSTF Finished First!</h4>
+          <p id="race-winner-desc">Minimal seek distance achieved, but check the fairness table below to see which requests starved.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Comprehensive Results Section -->
+    <section id="results-section" class="section-card results-section">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Benchmark Results & Comparison</h2>
+          <p class="section-desc">Exact numerical evaluation of head seek distance, average latency, and starvation.</p>
+        </div>
+        <div class="results-actions">
+          <button id="btn-run-20-runs" class="btn-primary">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+            <span>Run 20 Experiments & Average</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Monte Carlo Status Banner -->
+      <div id="monte-carlo-status" class="monte-carlo-banner hidden">
+        <div class="spinner"></div>
+        <span id="mc-status-text">Simulating 20 independent workloads with random heads...</span>
+      </div>
+
+      <!-- Metrics Table -->
+      <div class="table-responsive">
+        <table class="metrics-table" id="metrics-table">
+          <thead>
+            <tr>
+              <th>Algorithm</th>
+              <th>Total Seek Distance <small>(tracks)</small></th>
+              <th>Average Wait Time <small>(head movement)</small></th>
+              <th>Max Overtaking <small>(worst starvation)</small></th>
+              <th>Avg Overtaking <small>(fairness penalty)</small></th>
+              <th>Workload Verdict</th>
+            </tr>
+          </thead>
+          <tbody id="metrics-table-body">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+      <div class="table-legend">
+        <span class="legend-tag tag-best">★ Best in column</span>
+        <span class="legend-note">Note: In FCFS, requests are served in strict arrival order, guaranteeing <strong>0</strong> overtaking.</span>
+      </div>
+
+      <!-- Comparison Bar Charts -->
+      <div class="results-charts-grid">
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h4>Total Seek Distance <small>(Lower is better)</small></h4>
+            <span class="metric-tag">Efficiency</span>
+          </div>
+          <div class="chart-box">
+            <canvas id="seekChart"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h4>Max Overtaking / Starvation <small>(Lower is better)</small></h4>
+            <span class="metric-tag metric-tag-fairness">Fairness</span>
+          </div>
+          <div class="chart-box">
+            <canvas id="overtakeChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Fairness & Starvation Demo -->
+    <section id="fairness-section" class="section-card fairness-section">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Fairness & Starvation Demo</h2>
+          <p class="section-desc">Detecting requests left behind while the scheduler prioritizes local cylinder clusters.</p>
+        </div>
+        <div class="fairness-status-badge">
+          <span id="fairness-current-algo-label">SSTF Analysis</span>
+        </div>
+      </div>
+
+      <div class="fairness-container">
+        <div class="starvation-callout">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-body">
+            <h4 id="starvation-title">Why Database Hotspots Starve Far-Away Requests</h4>
+            <p id="starvation-explanation">
+              In database OLTP workloads, B-tree root index blocks and frequently accessed buffer pages 
+              create high request density in narrow cylinder ranges. <strong>SSTF</strong> greedily serves 
+              requests in the local cluster, continually overtaking older requests located on outer or inner tracks.
+              Notice below how requests highlighted in red were passed over dozens of times by newer requests.
+            </p>
+          </div>
+        </div>
+
+        <!-- Starved Requests Visual Strip -->
+        <div class="starved-strip-header">
+          <h4>Top Starved / Most Overtaken Requests</h4>
+          <span class="sub-text">Click or hover any request pill to locate it on the track bar</span>
+        </div>
+        <div class="starved-pills-grid" id="starved-pills-container">
+          <!-- Dynamically populated with requests, red for high starvation -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Algorithm Theory & Conclusion Cards -->
+    <section id="algorithms-section" class="section-card algorithms-section">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Algorithm Reference & DB Trade-offs</h2>
+          <p class="section-desc">Architectural characteristics for database storage engines and disk controllers.</p>
+        </div>
+      </div>
+
+      <div class="theory-cards-grid">
+        <!-- FCFS Card -->
+        <div class="theory-card card-fcfs">
+          <div class="theory-header">
+            <span class="theory-badge badge-fcfs">FCFS</span>
+            <h3>First-Come First-Served</h3>
+          </div>
+          <p class="theory-summary">Processes I/O requests strictly in the order they were submitted by queries.</p>
+          <div class="theory-block pros">
+            <strong>Pros:</strong>
+            <ul>
+              <li>Completely fair (0 overtaking guaranteed).</li>
+              <li>No starvation possible.</li>
+              <li>Trivial O(1) queue implementation.</li>
+            </ul>
+          </div>
+          <div class="theory-block cons">
+            <strong>Cons:</strong>
+            <ul>
+              <li>Catastrophic head thrashing across tracks.</li>
+              <li>Highest total seek latency for random/hotspots.</li>
+            </ul>
+          </div>
+          <div class="theory-db-note">
+            <strong>Database Context:</strong> Ideal only for dedicated append-only write-ahead log (WAL) streams.
+          </div>
+        </div>
+
+        <!-- SSTF Card -->
+        <div class="theory-card card-sstf">
+          <div class="theory-header">
+            <span class="theory-badge badge-sstf">SSTF</span>
+            <h3>Shortest Seek Time First</h3>
+          </div>
+          <p class="theory-summary">Greedily selects the pending request nearest to the current head position.</p>
+          <div class="theory-block pros">
+            <strong>Pros:</strong>
+            <ul>
+              <li>Substantially reduces total seek distance.</li>
+              <li>High raw I/O throughput in synthetic tests.</li>
+            </ul>
+          </div>
+          <div class="theory-block cons">
+            <strong>Cons:</strong>
+            <ul>
+              <li>Severe risk of starvation for boundary tracks.</li>
+              <li>High response-time variance (poor SLA guarantees).</li>
+            </ul>
+          </div>
+          <div class="theory-db-note">
+            <strong>Database Context:</strong> Can delay checkpoint flushes or cold table queries indefinitely while hot index queries dominate.
+          </div>
+        </div>
+
+        <!-- SCAN Card -->
+        <div class="theory-card card-scan">
+          <div class="theory-header">
+            <span class="theory-badge badge-scan">SCAN</span>
+            <h3>Elevator Algorithm</h3>
+          </div>
+          <p class="theory-summary">Sweeps toward the disk boundary serving requests, then reverses direction at track D-1.</p>
+          <div class="theory-block pros">
+            <strong>Pros:</strong>
+            <ul>
+              <li>Upper bound on starvation: every request served within 2 sweeps.</li>
+              <li>Much lower seek distance than FCFS.</li>
+            </ul>
+          </div>
+          <div class="theory-block cons">
+            <strong>Cons:</strong>
+            <ul>
+              <li>Unfair to tracks just behind the head when it reverses.</li>
+              <li>Mandatory trip to disk boundary (D-1) even if empty.</li>
+            </ul>
+          </div>
+          <div class="theory-db-note">
+            <strong>Database Context:</strong> Excellent balance for mixed OLTP queries and sequential table scans.
+          </div>
+        </div>
+
+        <!-- C-SCAN Card -->
+        <div class="theory-card card-cscan">
+          <div class="theory-header">
+            <span class="theory-badge badge-cscan">C-SCAN</span>
+            <h3>Circular SCAN</h3>
+          </div>
+          <p class="theory-summary">Sweeps in one direction to track D-1, then rapidly returns to track 0 without serving requests on the return.</p>
+          <div class="theory-block pros">
+            <strong>Pros:</strong>
+            <ul>
+              <li>Most uniform wait-time distribution across all cylinders.</li>
+              <li>Eliminates the bias favoring middle tracks in bi-directional SCAN.</li>
+            </ul>
+          </div>
+          <div class="theory-block cons">
+            <strong>Cons:</strong>
+            <ul>
+              <li>Extra seek distance incurred by the full-disk return jump.</li>
+            </ul>
+          </div>
+          <div class="theory-db-note">
+            <strong>Database Context:</strong> Gold standard for multi-tenant database clusters where predictable tail latency (p99) is required.
+          </div>
+        </div>
+      </div>
+
+      <!-- Conclusion Box -->
+      <div class="conclusion-box">
+        <div class="conclusion-header">
+          <span class="conclusion-icon">💡</span>
+          <h3>Final Architectural Conclusion</h3>
+        </div>
+        <p class="conclusion-text">
+          <strong>SCAN and C-SCAN</strong> provide the optimal engineering compromise between physical seek efficiency 
+          and fairness. While <strong>SSTF</strong> consistently yields the lowest seek distance in localized database hotspots, 
+          its high overtaking penalty creates unacceptable tail latencies (starvation) for cold data queries. 
+          <strong>FCFS</strong> guarantees total fairness with zero overtaking, but imposes extreme mechanical seek penalties 
+          that cripple overall transaction throughput.
+        </p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-left">
+        <span class="footer-title">Disk Scheduler for Database Workloads</span>
+        <span class="footer-sub">Operating Systems Capstone Project • Single-Page Vanilla HTML/CSS/JS</span>
+      </div>
+      <div class="footer-right">
+        <span>No dependencies needed • Powered by HTML5 Canvas & Chart.js</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Main JavaScript File -->
+  <script src="script.js"></script>
+</body>
+</html>
